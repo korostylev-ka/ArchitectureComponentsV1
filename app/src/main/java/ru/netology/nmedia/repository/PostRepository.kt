@@ -14,6 +14,6 @@ interface PostRepository {
     suspend fun getLatest()
     suspend fun save(post: Post, upload: MediaUpload?)
     suspend fun removeById(id: Long)
-    suspend fun likeById(id: Long)
+    suspend fun likeById(id: Long, isLiked: Boolean)
     suspend fun upload(upload: MediaUpload): Media
 }

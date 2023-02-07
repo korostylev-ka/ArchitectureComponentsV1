@@ -28,7 +28,6 @@ class PostRepositoryImpl @Inject constructor(
     private val postDao: PostDao,
     private val apiService: ApiService,
 ) : PostRepository {
-    val postPagingSource = PostPagingSource(apiService)
     //получаем данные из paging, не используя БД. количество постов на страниц 10, отключаем placeholders, указываем PagingSourceFactory
     override val data: Flow<PagingData<Post>> = Pager(
         config = PagingConfig(pageSize = 10, enablePlaceholders = false),
@@ -65,15 +64,6 @@ class PostRepositoryImpl @Inject constructor(
             throw NetworkError
         } catch (e: Exception) {
             throw UnknownError
-        }
-
-        //попробовал через функцию load PagingSource
-        //postPagingSource.load(PagingSource.LoadParams.Refresh(null,30,false))
-        data.map { pagingData ->
-            pagingData.map {
-                it.copy()
-            }
-
         }
     }
 
@@ -119,11 +109,38 @@ class PostRepositoryImpl @Inject constructor(
     }
 
     override suspend fun removeById(id: Long) {
-        TODO("Not yet implemented")
+        try {
+            //удаляем из локальной базы сначала
+            postDao.removeById(id)
+            val response = apiService.removeById(id)
+            if (!response.isSuccessful) {
+                throw ApiError(response.code(), response.message())
+            }
+
+        } catch (e: IOException) {
+            throw NetworkError
+        } catch (e: Exception) {
+            throw UnknownError
+        }
     }
 
-    override suspend fun likeById(id: Long) {
-        TODO("Not yet implemented")
+    override suspend fun likeById(id: Long, isLiked: Boolean) {
+        try {
+            //сначала локально в базе
+            postDao.likeById(id)
+            //ответ на вызов в зависимости от был ли уже лайк
+            val response = when (isLiked) {
+                false -> apiService.likeById(id)
+                else -> apiService.dislikeById(id)
+            }
+            if (!response.isSuccessful) {
+                throw ApiError(response.code(), response.message())
+            }
+        } catch (e: IOException) {
+            throw NetworkError
+        } catch (e: Exception) {
+            throw UnknownError
+        }
     }
 
     override suspend fun upload(upload: MediaUpload): Media {
